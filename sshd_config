@@ -1,0 +1,9 @@
+Port 22
+PasswordAuthentication no
+AllowUsers git
+AllowTcpForwarding no
+GatewayPorts no
+X11Forwarding no
+AuthorizedKeysFile /etc/authorized_keys/%u
+ForceCommand git-lfs-transfer
+ChrootDirectory /data
