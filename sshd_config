@@ -1,6 +1,9 @@
 Port 22
 PasswordAuthentication no
 AllowUsers git
+AllowAgentForwarding no
+AllowStreamLocalForwarding no
+AuthenticationMethods publickey
 AllowTcpForwarding no
 GatewayPorts no
 X11Forwarding no
