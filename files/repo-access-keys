@@ -1,0 +1,52 @@
+#!/bin/sh
+set -eu
+set -o pipefail
+
+die () {
+  if [ $# -gt 0 ]; then
+    >&2 printf "$@"
+  fi
+  exit 1
+}
+
+[ $# -eq 2 ] || die 'Usage: repo-access-keys <key_type> <key_base64>\n'
+
+repos_base=/srv/git
+authorized_keys_dir=${repos_base}/authorized_keys
+
+key_type=$1;shift
+case "${key_type}" in
+  *[!a-zA-Z0-9.@-]*)
+    exit 1
+    ;;
+esac
+
+key_base64=$1;shift
+case "${key_base64}" in
+  *[!a-zA-Z0-9+/=]*)
+    exit 1
+    ;;
+esac
+
+for key_file in "${authorized_keys_dir}"/*.pub; do
+  key_name=${key_file%.pub}
+  key_name=${key_name##*/}
+  while read -r authorized_key_type authorized_key_base64 comments; do
+    if [ -z "${authorized_key_type}" ] || [ -z "${authorized_key_base64}" ]; then
+      continue
+    fi
+    case "${authorized_key_type}" in
+      '#'*)
+        # comments are ignored in OpenSSH authorized_keys files
+        continue
+        ;;
+      *[!a-zA-Z0-9=+_.@-]*)
+        # skip any keys that seem to have custom options specified
+        continue
+        ;;
+    esac
+    [ "${key_type}" = "${authorized_key_type}" ] || continue
+    [ "${key_base64}" = "${authorized_key_base64}" ] || continue
+    printf 'restrict,command="repo-access %s" %s %s %s\n' "'${key_name}'" "${authorized_key_type}" "${authorized_key_base64}" "${comments}"
+  done < "${key_file}"
+done

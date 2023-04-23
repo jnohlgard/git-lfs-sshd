@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+[ $# -eq 2 ] || exit 1
+case "$2" in
+  upload | download )
+    ;;
+  *)
+    >&2 printf 'Unknown operation\n'
+    exit 2
+    ;;
+esac
+exec /usr/local/bin/git-lfs-transfer "$@"

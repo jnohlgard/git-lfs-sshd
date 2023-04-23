@@ -1,0 +1,3 @@
+#!/bin/sh
+printf 'Hi %s! You have successfully authenticated, but interactive shell access is not provided.\n' "${REPO_ACCESS_USER}"
+exit 128

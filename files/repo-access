@@ -1,0 +1,99 @@
+#!/bin/sh
+set -euo pipefail
+
+die () {
+  if [ $# -gt 0 ]; then
+    >&2 printf "$@"
+  fi
+  exit 1
+}
+
+[ $# -ge 1 ] || die 'This is not a shell\n'
+
+abspath () {
+  [ $# -eq 1 ] || return 1
+  # subshell to not mess with the PWD in the script
+  ( cd "$1" && { pwd -P 2>/dev/null || env PWD= pwd; }; )
+}
+
+# no globbing
+set -f
+
+repos_base=/srv/git
+repos_root=$(abspath "${repos_base}/repos/")
+git_shell_commands=${repos_base}/git-shell-commands
+
+export REPO_ACCESS_USER=$1;shift
+
+if [ $# -lt 2 ]; then
+  if [ -n "${SSH_ORIGINAL_COMMAND:-}" ]; then
+    set -f
+    set -- ${SSH_ORIGINAL_COMMAND}
+    unset SSH_ORIGINAL_COMMAND
+  else
+    if [ -x "${git_shell_commands}/no-interactive-login" ]; then
+      "${git_shell_commands}/no-interactive-login" </dev/null
+      exit 1
+    fi
+    die 'Hi %s, this is not a shell\n' "${REPO_ACCESS_USER}"
+  fi
+fi
+
+[ $# -ge 2 ] || die 'Missing arguments\n'
+
+cmd=$1; shift
+repo_path=$1;shift
+case "${cmd}" in
+  git-upload-pack | git-upload-archive | git-receive-pack)
+    [ $# -eq 0 ] || die 'Wrong number of arguments\n'
+    ;;
+  git-lfs-transfer)
+    [ $# -eq 1 ] || die 'Wrong number of arguments\n'
+    case "$1" in
+      *[!a-z-]*)
+        die 'Bad operation\n'
+        ;;
+    esac
+    ;;
+  *)
+    die 'Unknown command\n'
+    ;;
+esac
+
+# trim leading and trailing path dividers
+repo_path=${repo_path##/}
+repo_path=${repo_path%%/}
+
+[ -n "${repo_path}" ] || die 'Missing repo\n'
+
+# Ensure repo_path ends in ".git"
+repo_path=${repo_path%.git}.git
+
+case "${repo_path}" in
+  *[![:graph:]]* | *..* | */.* | *./* | *. | .* | *[[:cntrl:]]* | *[[:blank:]]* )
+    die 'Invalid path\n'
+    ;;
+esac
+
+repo_path=$(git check-ref-format --normalize "${repo_path}") || die 'Invalid path\n'
+[ -n "${repo_path}" ] || die 'Invalid path\n'
+
+repo_abspath=${repos_root}/${repo_path}
+set -- "${repo_abspath}" "$@"
+
+if [ -d "${repo_abspath}" ] && (cd "${repo_abspath}" 2>/dev/null) ; then
+  case "$(abspath "${repo_abspath}")" in
+    "${repos_root}/"*)
+      # OK, repo is below repos_root, even if there were any symlinks in the path
+      ;;
+    *)
+      # the given repo point to a directory outside of the repos_root
+      die 'Only local git repos are accessible\n'
+      ;;
+  esac
+  cd "${repos_root}"
+  exec "$(command -v git-shell)" -c "${cmd}$(printf " '%s'" "$@")"
+else
+  >&2 printf 'Not found: %s\n' "${repo_path}"
+  exit 1
+fi
