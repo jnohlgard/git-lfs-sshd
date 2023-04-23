@@ -21,6 +21,7 @@ COPY files/repo-access /usr/local/bin/
 COPY files/repo-access-keys /usr/local/bin/
 COPY files/sshd_config /etc/ssh/sshd_config
 COPY files/git-shell-commands/* ${git_root}/git-shell-commands/
+COPY files/gitconfig ${git_root}/.gitconfig
 
 COPY --from=builder /go/bin/git-lfs-transfer  /usr/local/bin/git-lfs-transfer
 
