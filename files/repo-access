@@ -60,6 +60,10 @@ case "${cmd}" in
     ;;
 esac
 
+# git adds single quotes around the repo name when calling git-upload-pack etc.
+repo_path=${repo_path#\'}
+repo_path=${repo_path%\'}
+
 # trim leading and trailing path dividers
 repo_path=${repo_path##/}
 repo_path=${repo_path%%/}
